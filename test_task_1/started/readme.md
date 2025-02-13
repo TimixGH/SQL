@@ -1,4 +1,4 @@
-При первом запуске, в базе данных создадуться тестовые таблицы с данными.
+При первом запуске, в базе данных создадутся тестовые таблицы с данными.
 
 ```
 postgres  | /usr/local/bin/docker-entrypoint.sh: running /docker-entrypoint-initdb.d/create.sql
