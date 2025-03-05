@@ -63,29 +63,29 @@
 
 1. SQL-запрос для расчёта среднего времени ответа менеджеров с подробными комментариями, что и как делали.
 
-**Мой ответ на тестовое задние:**
+**Ответ:**
 
 ```sql
 WITH pre1 AS (
     -- Выбираем уникальные записи по паре (answer_created_by, aswer_tm)
     SELECT DISTINCT ON (answer_created_by, aswer_tm)
-        icm.entity_id, -- ID сделки
-        icm.created_by, -- ID клиента, отправившего входящее сообщение
-        to_timestamp(icm.created_at) AS asc_tm, -- Время создания входящего сообщения (преобразованное в timestamp)
-        cm.aswer_tm, -- Время ответа на входящее сообщение
-        cm.answer_created_by -- ID менеджера, отправившего ответ
-    FROM test.chat_messages AS icm -- Основная таблица с сообщениями
+        icm.entity_id, 
+        icm.created_by, 
+        to_timestamp(icm.created_at) AS asc_tm, 
+        cm.aswer_tm, 
+        cm.answer_created_by 
+    FROM test.chat_messages AS icm 
     LEFT JOIN LATERAL (
         -- Подзапрос для поиска ближайшего ответа на входящее сообщение
         SELECT
-            to_timestamp(created_at) AS aswer_tm, -- Время ответа (преобразованное в timestamp)
-            created_by AS answer_created_by -- ID пользователя, отправившего ответ
+            to_timestamp(created_at) AS aswer_tm, 
+            created_by AS answer_created_by 
         FROM test.chat_messages
         WHERE
-            entity_id = icm.entity_id -- Ответ должен быть в той же сделке
-            AND created_by != icm.created_by -- Ответ должен быть от менеджера
-            AND created_at > icm.created_at -- Ответ должен быть отправлен после входящего сообщения
-            AND type = 'outgoing_chat_message' -- Тип сообщения — 'outgoing_chat_message' (ответ)
+            entity_id = icm.entity_id 
+            AND created_by != icm.created_by 
+            AND created_at > icm.created_at 
+            AND type = 'outgoing_chat_message' 
         LIMIT 1 -- Ограничиваем результат одним ответом (ближайшим по времени)
     ) AS cm ON true
     WHERE icm.type = 'incoming_chat_message' -- выбираем только 'incoming_chat_message' сообщения
@@ -93,7 +93,7 @@ WITH pre1 AS (
 -- Создаем временную таблицу pre2, которая рассчитывает временной интервал между входящим сообщением и ответом
 pre2 AS (
     SELECT
-        answer_created_by, -- ID менеджера, отправившего ответ
+        answer_created_by,
         justify_interval(
             CASE
                 -- Если и входящее сообщение, и ответ были отправлены между 00:00 и 09:30, считаем разницу напрямую
@@ -105,19 +105,19 @@ pre2 AS (
                 -- В остальных случаях вычитаем 9 часов 30 минут за каждый день между входящим сообщением и ответом
                 ELSE aswer_tm - asc_tm - (INTERVAL '9 hour 30 MINUTE' * (DATE(aswer_tm) - DATE(asc_tm)))
             END
-        ) AS diff_time -- Временной интервал между входящим сообщением и ответом
+        ) AS diff_time
     FROM pre1
     WHERE aswer_tm IS NOT NULL -- выбираем записи, где есть ответ от менеджера
 )
 -- Финальный запрос: вычисляем среднее время ответа для каждого менеджера и отдела
 SELECT
-    to_char(AVG(pre2.diff_time), 'HH24:MI:SS') AS "Среднее время ответа", -- Среднее время ответа
-    m.name_mop Менеджер, -- Имя менеджера
-    r.rop_name AS "Руководитель Отдела" -- Имя руководителя отдела
+    to_char(AVG(pre2.diff_time), 'HH24:MI:SS') AS "Среднее время ответа",
+    m.name_mop Менеджер,
+    r.rop_name AS "Руководитель Отдела"
 FROM pre2
-LEFT JOIN test.managers AS m ON m.mop_id = pre2.answer_created_by -- Присоединяем таблицу менеджеров
-LEFT JOIN test.rops AS r ON m.rop_id::int = r.rop_id -- Присоединяем таблицу с руководителями отделов
-GROUP BY m.name_mop, r.rop_name -- Группируем по менеджеру и руководителю
+LEFT JOIN test.managers AS m ON m.mop_id = pre2.answer_created_by
+LEFT JOIN test.rops AS r ON m.rop_id::int = r.rop_id
+GROUP BY m.name_mop, r.rop_name
 ```
 
 ### Результат запроса:
